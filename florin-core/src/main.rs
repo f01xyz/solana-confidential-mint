@@ -23,6 +23,11 @@ use spl_token_client::{
 
 // Our library with confidential transfer operations
 use lib::confidential_ops;
+use lib::{
+    proof_import::{import_and_verify_proof, ProofType},
+    proof_verification::{verify_proof, VerificationConfig},
+};
+use std::path::Path;
 
 // Size of a mint account
 const MINT_SIZE: usize = 82;
@@ -79,6 +84,112 @@ async fn main() -> Result<()> {
     // Number of decimals for the mint
     let decimals = 2;
 
+    // Example of importing and using a verified proof
+    if let Some(arg) = std::env::args().nth(1) {
+        match arg.as_str() {
+            "create-mint" => {
+                // Create a mint with confidential transfer extension
+                println!("\nCreating a mint with confidential transfer extension...");
+                let mint_pubkey = create_confidential_mint(
+                    rpc_client.clone(),
+                    &payer,
+                    &mint,
+                    decimals,
+                ).await?;
+                
+                println!("Mint created successfully with address: {}", mint_pubkey);
+            },
+            "import-transfer-proof" => {
+                if let Some(proof_path) = std::env::args().nth(2) {
+                    let source_account = if let Some(arg) = std::env::args().nth(3) {
+                        arg.parse::<Pubkey>()?
+                    } else {
+                        return Err(anyhow!("Source account required"));
+                    };
+                    
+                    let destination_account = if let Some(arg) = std::env::args().nth(4) {
+                        arg.parse::<Pubkey>()?
+                    } else {
+                        return Err(anyhow!("Destination account required"));
+                    };
+                    
+                    let amount = if let Some(arg) = std::env::args().nth(5) {
+                        arg.parse::<u64>()?
+                    } else {
+                        return Err(anyhow!("Amount required"));
+                    };
+                    
+                    println!("Importing and verifying transfer proof from {}...", proof_path);
+                    let proof = import_and_verify_proof(Path::new(&proof_path))?;
+                    
+                    if proof.proof_type != ProofType::Transfer {
+                        return Err(anyhow!("Expected a transfer proof"));
+                    }
+                    
+                    println!("Proof verified successfully!");
+                    
+                    // Use the proof for a confidential transfer
+                    let signature = confidential_ops::transfer_ct_with_proof(
+                        rpc_client.clone(),
+                        &source_account,
+                        &destination_account,
+                        &payer,
+                        amount,
+                        decimals,
+                        &proof,
+                    ).await?;
+                    
+                    println!("Confidential transfer completed with signature: {}", signature);
+                } else {
+                    return Err(anyhow!("Proof file path required"));
+                }
+            },
+            "import-withdraw-proof" => {
+                if let Some(proof_path) = std::env::args().nth(2) {
+                    let token_account = if let Some(arg) = std::env::args().nth(3) {
+                        arg.parse::<Pubkey>()?
+                    } else {
+                        return Err(anyhow!("Token account required"));
+                    };
+                    
+                    let amount = if let Some(arg) = std::env::args().nth(4) {
+                        arg.parse::<u64>()?
+                    } else {
+                        return Err(anyhow!("Amount required"));
+                    };
+                    
+                    println!("Importing and verifying withdraw proof from {}...", proof_path);
+                    let proof = import_and_verify_proof(Path::new(&proof_path))?;
+                    
+                    if proof.proof_type != ProofType::Withdraw {
+                        return Err(anyhow!("Expected a withdraw proof"));
+                    }
+                    
+                    println!("Proof verified successfully!");
+                    
+                    // Use the proof for a confidential withdrawal
+                    let signature = confidential_ops::withdraw_ct_with_proof(
+                        rpc_client.clone(),
+                        &token_account,
+                        &payer,
+                        amount,
+                        decimals,
+                        &proof,
+                    ).await?;
+                    
+                    println!("Confidential withdrawal completed with signature: {}", signature);
+                } else {
+                    return Err(anyhow!("Proof file path required"));
+                }
+            },
+            _ => {
+                return Err(anyhow!("Unknown command"));
+            }
+        }
+        
+        return Ok(());
+    }
+    
     // Create a mint with confidential transfer extension
     println!("\nCreating a mint with confidential transfer extension...");
     let mint_pubkey = create_confidential_mint(
@@ -286,7 +397,7 @@ async fn confidential_transfer_example() -> Result<()> {
         &payer,
         &sender_elgamal_keypair,
         &sender_ae_key,
-        &recipient_elgamal_keypair.public,
+        &recipient_elgamal_keypair.pubkey(),
         transfer_amount,
         decimals,
     ).await?;

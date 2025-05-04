@@ -141,7 +141,7 @@ async fn main() -> Result<()> {
         &payer,
         &sender_elgamal_keypair,
         &sender_ae_key,
-        &recipient_elgamal_keypair.public(),
+        &recipient_elgamal_keypair.pubkey()(),
         transfer_amount,
         decimals,
     ).await?;

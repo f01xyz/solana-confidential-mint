@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
 use std::path::Path;
 
@@ -11,7 +11,7 @@ pub struct ImportableProof {
 }
 
 /// Types of proofs that can be imported
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub enum ProofType {
     Transfer,
     Withdraw,
@@ -35,22 +35,32 @@ pub fn import_proof_from_file(path: &Path) -> Result<ImportableProof> {
     Ok(proof)
 }
 
-/// Validate the proof and return whether it's valid
-/// In a real implementation, this would check that the proof is correctly formatted
-/// and potentially verify signatures or other validity conditions
-pub fn validate_imported_proof(proof: &ImportableProof) -> bool {
-    // This is just a placeholder. In a real implementation,
-    // we would actually validate the proof structure and potentially
-    // its cryptographic properties.
+/// Import a proof from a file and verify it
+/// This is a convenience function that combines import and verification
+pub fn import_and_verify_proof(path: &Path) -> Result<ImportableProof> {
+    let proof = import_proof_from_file(path)?;
     
-    // For now, we just check that the data is not empty
-    !proof.data.is_empty()
+    // Use our new verification module to verify the proof
+    if !crate::proof_verification::is_proof_valid(&proof) {
+        return Err(anyhow!("Proof verification failed"));
+    }
+    
+    Ok(proof)
 }
 
 /// Use the imported proof in a confidential transfer operation
 /// This demonstrates how florin-core would use proofs from florin-zk
 pub fn use_imported_proof(proof: &ImportableProof) -> Result<()> {
     // In a real implementation, this would use the proof in an on-chain transaction
+    
+    // First verify the proof
+    let config = crate::proof_verification::VerificationConfig::default();
+    let verification_result = crate::proof_verification::verify_proof(proof, &config)
+        .map_err(|e| anyhow!("Proof verification failed: {}", e))?;
+    
+    if !verification_result.is_valid {
+        return Err(anyhow!("Invalid proof"));
+    }
     
     match proof.proof_type {
         ProofType::Transfer => {
