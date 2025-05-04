@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Florin ZK Proof Schema",
+  "description": "Schema for validating Florin ZK proof DTOs",
+  "type": "object",
+  "required": [
+    "version",
+    "proof_id",
+    "proof_type",
+    "zk_sdk_version",
+    "data",
+    "metadata"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Version of the DTO format",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "proof_id": {
+      "type": "string",
+      "description": "UUID of the proof",
+      "format": "uuid"
+    },
+    "proof_type": {
+      "type": "string",
+      "description": "Type of the proof",
+      "enum": ["Transfer", "Withdraw", "PubkeyValidity", "TransferWithProof", "WithdrawWithProof"]
+    },
+    "zk_sdk_version": {
+      "type": "string",
+      "description": "Version of the ZK SDK used to generate the proof"
+    },
+    "data": {
+      "type": "string",
+      "description": "Base64 encoded serialized proof data"
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "timestamp",
+        "amount"
+      ],
+      "properties": {
+        "source_address": {
+          "type": ["string", "null"],
+          "description": "Base58 encoded source wallet or token account address"
+        },
+        "destination_address": {
+          "type": ["string", "null"],
+          "description": "Base58 encoded destination wallet or token account address"
+        },
+        "mint_address": {
+          "type": ["string", "null"],
+          "description": "Base58 encoded address of the token mint"
+        },
+        "amount": {
+          "type": ["integer", "null"],
+          "description": "Amount in the smallest denomination of the token"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO8601 timestamp of proof generation",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+} 

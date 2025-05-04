@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "proof_id": "12345678-1234-1234-1234-123456789012",
+  "proof_type": "Transfer",
+  "zk_sdk_version": "0.1.0",
+  "data": "eyJkYXRhX3R5cGUiOiJ0cmFuc2Zlcl9wcm9vZiIsImJpbmFyeV9kYXRhIjpbMSwgMiwgMywgNCwgNSwgNiwgNiwgNywgOCwgOSwgMTAsIDExLCAxMiwgMTMsIDE0LCAxNSwgMTYsIDE3LCAxOCwgMTksIDIwLCAyMSwgMjIsIDIzLCAyNCwgMjUsIDI2LCAyNywgMjgsIDI5LCAzMCwgMzEsIDMyLCAzMywgMzQsIDM1LCAzNiwgMzcsIDM4LCAzOSwgNDAsIDQxLCA0MiwgNDMsIDQ0LCA0NSwgNDYsIDQ3LCA0OCwgNDksIDUwLCA1MSwgNTIsIDUzLCA1NCwgNTUsIDU2LCA1NywgNTgsIDU5LCA2MCwgNjEsIDYyLCA2M10gfQ==",
+  "metadata": {
+    "source_address": "5oVky3o3pNbZfWYUNvLLHM5VRGBFUmE3zPRqUE5zGwxe",
+    "destination_address": "HcRqbE5nwCDXxGZgHS7iCFAWdNgGLW6bZQzqA5vT9Wgv",
+    "mint_address": "So11111111111111111111111111111111111111112",
+    "amount": 1000000,
+    "timestamp": "2023-05-05T00:12:00Z"
+  }
+}

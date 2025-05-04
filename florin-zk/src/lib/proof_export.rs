@@ -15,6 +15,13 @@ use spl_token_2022::extension::confidential_transfer::instruction::{
     TransferWithFeeInstructionData, WithdrawInstructionData
 };
 use base64::{Engine as _, engine::general_purpose};
+use uuid::Uuid;
+use chrono::{DateTime, Utc};
+
+/// Get current crate version from environment
+pub fn get_zk_sdk_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
 
 /// Types of ZK proofs that can be exported
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -22,6 +29,7 @@ pub enum ProofType {
     Transfer,
     Withdraw,
     PubkeyValidity,
+    // These are the old types, kept for backward compatibility
     TransferWithProof,
     WithdrawWithProof,
 }
@@ -29,17 +37,21 @@ pub enum ProofType {
 /// Metadata for the proof
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProofMetadata {
-    pub source_pubkey: Option<String>,
-    pub destination_pubkey: Option<String>,
+    pub source_address: Option<String>,
+    pub destination_address: Option<String>,
+    pub mint_address: Option<String>,
     pub amount: Option<u64>,
-    pub timestamp: u64,
+    pub timestamp: String,  // ISO8601 format
 }
 
 /// Represents a serializable ZK proof that can be exported to a file
 /// and imported in florin-core
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ExportableProof {
+    pub version: String,
+    pub proof_id: String,   // UUID
     pub proof_type: ProofType,
+    pub zk_sdk_version: String,
     pub data: String, // Base64 encoded serialized proof data
     pub metadata: ProofMetadata,
 }
@@ -158,16 +170,17 @@ pub fn export_transfer_proof(
     
     // Create the exportable proof
     let exportable_proof = ExportableProof {
+        version: "1.0.0".to_string(),
+        proof_id: Uuid::new_v4().to_string(),
         proof_type: ProofType::Transfer,
+        zk_sdk_version: get_zk_sdk_version(),
         data: general_purpose::STANDARD.encode(serialized_proof),
         metadata: ProofMetadata {
-            source_pubkey,
-            destination_pubkey,
+            source_address: source_pubkey,
+            destination_address: destination_pubkey,
+            mint_address: None, // This should be populated in the new implementation
             amount: Some(amount),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: Utc::now().to_rfc3339(),
         },
     };
     
@@ -197,13 +210,11 @@ pub fn export_transfer_with_proof(
         proof_type: ProofType::TransferWithProof,
         data: general_purpose::STANDARD.encode(serialized_proof),
         metadata: ProofMetadata {
-            source_pubkey,
-            destination_pubkey,
+            source_address: source_pubkey,
+            destination_address: destination_pubkey,
+            mint_address: None, // This should be populated in the new implementation
             amount: Some(amount),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: Utc::now().to_rfc3339(),
         },
     };
     
@@ -237,13 +248,11 @@ pub fn export_withdraw_proof(
         proof_type: ProofType::Withdraw,
         data: general_purpose::STANDARD.encode(serialized_proof),
         metadata: ProofMetadata {
-            source_pubkey,
-            destination_pubkey: None,
+            source_address: source_pubkey,
+            destination_address: None,
+            mint_address: None, // This should be populated in the new implementation
             amount: Some(amount),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: Utc::now().to_rfc3339(),
         },
     };
     
@@ -272,13 +281,11 @@ pub fn export_withdraw_with_proof(
         proof_type: ProofType::WithdrawWithProof,
         data: general_purpose::STANDARD.encode(serialized_proof),
         metadata: ProofMetadata {
-            source_pubkey,
-            destination_pubkey: None,
+            source_address: source_pubkey,
+            destination_address: None,
+            mint_address: None, // This should be populated in the new implementation
             amount: Some(amount),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: Utc::now().to_rfc3339(),
         },
     };
     
@@ -437,4 +444,95 @@ pub fn create_and_export_demo_withdraw_with_proof(
         Some(bs58::encode(&Into::<[u8; 32]>::into(keypair.pubkey())).into_string()),
         path,
     )
+}
+
+/// Export a transfer proof to a file with mint address in metadata
+pub fn export_transfer_proof_with_mint(
+    proof_data: &TransferProofData,
+    amount: u64,
+    source_pubkey: Option<String>,
+    destination_pubkey: Option<String>,
+    mint_address: Option<String>,
+    path: &Path,
+) -> Result<()> {
+    // Since TransferProofData doesn't implement Serialize, we'll create a custom serializable wrapper
+    let serializable_proof = SerializableProofData {
+        data_type: "transfer_proof".to_string(),
+        // In a real implementation we would serialize the proof data properly
+        binary_data: vec![0; 64], // Placeholder
+    };
+    
+    // Serialize our wrapper instead
+    let serialized_proof = serde_json::to_string(&serializable_proof)?;
+    
+    // Create a unique proof ID
+    let proof_id = Uuid::new_v4().to_string();
+    
+    // Create the exportable proof
+    let exportable_proof = ExportableProof {
+        version: "1.0.0".to_string(),
+        proof_id,
+        proof_type: ProofType::Transfer,
+        zk_sdk_version: get_zk_sdk_version(),
+        data: general_purpose::STANDARD.encode(serialized_proof),
+        metadata: ProofMetadata {
+            source_address: source_pubkey,
+            destination_address: destination_pubkey,
+            mint_address,
+            amount: Some(amount),
+            timestamp: Utc::now().to_rfc3339(),
+        },
+    };
+    
+    // Write to file
+    let serialized = serde_json::to_string_pretty(&exportable_proof)?;
+    let mut file = File::create(path)?;
+    file.write_all(serialized.as_bytes())?;
+    
+    Ok(())
+}
+
+/// Export a withdraw proof to a file with mint address in metadata
+pub fn export_withdraw_proof_with_mint(
+    proof_data: &WithdrawProofData,
+    amount: u64,
+    source_pubkey: Option<String>,
+    mint_address: Option<String>,
+    path: &Path,
+) -> Result<()> {
+    // Since WithdrawProofData doesn't implement Serialize, we'll create a custom serializable wrapper
+    let serializable_proof = SerializableProofData {
+        data_type: "withdraw_proof".to_string(),
+        // In a real implementation we would serialize the proof data properly
+        binary_data: vec![0; 64], // Placeholder
+    };
+    
+    // Serialize our wrapper instead
+    let serialized_proof = serde_json::to_string(&serializable_proof)?;
+    
+    // Create a unique proof ID
+    let proof_id = Uuid::new_v4().to_string();
+    
+    // Create the exportable proof
+    let exportable_proof = ExportableProof {
+        version: "1.0.0".to_string(),
+        proof_id,
+        proof_type: ProofType::Withdraw,
+        zk_sdk_version: get_zk_sdk_version(),
+        data: general_purpose::STANDARD.encode(serialized_proof),
+        metadata: ProofMetadata {
+            source_address: source_pubkey,
+            destination_address: None,
+            mint_address,
+            amount: Some(amount),
+            timestamp: Utc::now().to_rfc3339(),
+        },
+    };
+    
+    // Write to file
+    let serialized = serde_json::to_string_pretty(&exportable_proof)?;
+    let mut file = File::create(path)?;
+    file.write_all(serialized.as_bytes())?;
+    
+    Ok(())
 } 

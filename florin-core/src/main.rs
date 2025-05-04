@@ -3,7 +3,7 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
     pubkey::Pubkey,
-    signature::{Keypair, Signer},
+    signature::{Keypair, Signer, read_keypair_file},
     system_instruction,
     transaction::Transaction,
 };
@@ -98,6 +98,80 @@ async fn main() -> Result<()> {
                 
                 println!("Mint created successfully with address: {}", mint_pubkey);
             },
+            "create-account" => {
+                // Parse arguments
+                let keypair_path = if let Some(arg) = std::env::args().nth(2) {
+                    if arg == "--keypair" {
+                        std::env::args().nth(3)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                let owner_keypair_path = if let Some(arg) = std::env::args().nth(4) {
+                    if arg == "--owner-keypair" {
+                        std::env::args().nth(5)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                let mint_address = if let Some(arg) = std::env::args().nth(6) {
+                    if arg == "--mint" {
+                        std::env::args().nth(7)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                // Check for output-address-only flag
+                let output_address_only = std::env::args().any(|arg| arg == "--output-address-only");
+                
+                // Load the payer keypair
+                let payer = if let Some(path) = keypair_path {
+                    read_keypair_file(path).context("Failed to read keypair file")?
+                } else {
+                    // Default to default keypair if no keypair specified
+                    payer.insecure_clone()
+                };
+                
+                // Load the owner keypair
+                let owner = if let Some(path) = owner_keypair_path {
+                    read_keypair_file(path).context("Failed to read owner keypair file")?
+                } else {
+                    // Default to payer if no owner keypair specified
+                    payer.insecure_clone()
+                };
+                
+                // Parse mint address
+                let mint = if let Some(addr) = mint_address {
+                    addr.parse::<Pubkey>().context("Failed to parse mint address")?
+                } else {
+                    return Err(anyhow!("Mint address required. Usage: create-account --keypair <PATH> --owner-keypair <PATH> --mint <ADDRESS>"));
+                };
+                
+                // Create the token account
+                let (token_account, _, _, _) = confidential_ops::create_confidential_token_account(
+                    rpc_client.clone(),
+                    &payer,
+                    &mint,
+                    &owner,
+                ).await?;
+                
+                if output_address_only {
+                    // Output only the token account address
+                    println!("{}", token_account);
+                } else {
+                    println!("Token account created successfully!");
+                    println!("Token Account: {}", token_account);
+                }
+            },
             "import-transfer-proof" => {
                 if let Some(proof_path) = std::env::args().nth(2) {
                     let source_account = if let Some(arg) = std::env::args().nth(3) {
@@ -181,8 +255,273 @@ async fn main() -> Result<()> {
                     return Err(anyhow!("Proof file path required"));
                 }
             },
+            "confidential-transfer" => {
+                // Parse arguments
+                let keypair_path = if let Some(arg) = std::env::args().nth(2) {
+                    if arg == "--keypair" {
+                        std::env::args().nth(3)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                let proof_path = if let Some(arg) = std::env::args().nth(4) {
+                    if arg == "--proof-path" {
+                        std::env::args().nth(5)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                // Load the owner keypair
+                let owner = if let Some(path) = keypair_path {
+                    read_keypair_file(path).context("Failed to read keypair file")?
+                } else {
+                    // Default to payer if no keypair specified
+                    payer.insecure_clone()
+                };
+                
+                // Ensure we have a proof path
+                let proof_file = proof_path.ok_or_else(|| 
+                    anyhow!("Proof path required. Usage: confidential-transfer --keypair <PATH> --proof-path <PATH>")
+                )?;
+                
+                println!("Performing confidential transfer with proof from {}...", proof_file);
+                
+                // Call the confidential_transfer function
+                let signature = confidential_ops::confidential_transfer(
+                    rpc_client.clone(),
+                    &owner,
+                    Path::new(&proof_file),
+                ).await?;
+                
+                println!("Confidential transfer completed successfully!");
+                println!("Transaction signature: {}", signature);
+            },
+            "mint" => {
+                // Parse arguments
+                let keypair_path = if let Some(arg) = std::env::args().nth(2) {
+                    if arg == "--keypair" {
+                        std::env::args().nth(3)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                let mint_address = if let Some(arg) = std::env::args().nth(4) {
+                    if arg == "--mint" {
+                        std::env::args().nth(5)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                let destination = if let Some(arg) = std::env::args().nth(6) {
+                    if arg == "--destination" {
+                        std::env::args().nth(7)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                let amount = if let Some(arg) = std::env::args().nth(8) {
+                    if arg == "--amount" {
+                        if let Some(amt) = std::env::args().nth(9) {
+                            amt.parse::<u64>().ok()
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                // Load the payer keypair
+                let payer = if let Some(path) = keypair_path {
+                    read_keypair_file(path).context("Failed to read keypair file")?
+                } else {
+                    // Default to default keypair if no keypair specified
+                    payer.insecure_clone()
+                };
+                
+                // Parse mint address
+                let mint = if let Some(addr) = mint_address {
+                    addr.parse::<Pubkey>().context("Failed to parse mint address")?
+                } else {
+                    return Err(anyhow!("Mint address required. Usage: mint --keypair <PATH> --mint <ADDRESS> --destination <ADDRESS> --amount <AMOUNT>"));
+                };
+                
+                // Parse destination address
+                let destination_address = if let Some(addr) = destination {
+                    addr.parse::<Pubkey>().context("Failed to parse destination address")?
+                } else {
+                    return Err(anyhow!("Destination address required. Usage: mint --keypair <PATH> --mint <ADDRESS> --destination <ADDRESS> --amount <AMOUNT>"));
+                };
+                
+                // Parse amount
+                let mint_amount = if let Some(amt) = amount {
+                    amt
+                } else {
+                    return Err(anyhow!("Amount required. Usage: mint --keypair <PATH> --mint <ADDRESS> --destination <ADDRESS> --amount <AMOUNT>"));
+                };
+                
+                // Mint tokens
+                let signature = confidential_ops::mint_florin(
+                    rpc_client.clone(),
+                    &mint,
+                    &destination_address,
+                    &payer,
+                    mint_amount,
+                    decimals,
+                ).await?;
+                
+                println!("Tokens minted successfully!");
+                println!("Transaction signature: {}", signature);
+            },
+            "deposit" => {
+                // Parse arguments
+                let keypair_path = if let Some(arg) = std::env::args().nth(2) {
+                    if arg == "--keypair" {
+                        std::env::args().nth(3)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                let account = if let Some(arg) = std::env::args().nth(4) {
+                    if arg == "--account" {
+                        std::env::args().nth(5)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                let amount = if let Some(arg) = std::env::args().nth(6) {
+                    if arg == "--amount" {
+                        if let Some(amt) = std::env::args().nth(7) {
+                            amt.parse::<u64>().ok()
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                // Load the owner keypair
+                let owner = if let Some(path) = keypair_path {
+                    read_keypair_file(path).context("Failed to read keypair file")?
+                } else {
+                    // Default to default keypair if no keypair specified
+                    payer.insecure_clone()
+                };
+                
+                // Parse account address
+                let token_account = if let Some(addr) = account {
+                    addr.parse::<Pubkey>().context("Failed to parse account address")?
+                } else {
+                    return Err(anyhow!("Account address required. Usage: deposit --keypair <PATH> --account <ADDRESS> --amount <AMOUNT>"));
+                };
+                
+                // Parse amount
+                let deposit_amount = if let Some(amt) = amount {
+                    amt
+                } else {
+                    return Err(anyhow!("Amount required. Usage: deposit --keypair <PATH> --account <ADDRESS> --amount <AMOUNT>"));
+                };
+                
+                // Create ElGamal keypair (normally this would be loaded from a file)
+                let elgamal_keypair = ElGamalKeypair::new_rand();
+                
+                // Deposit tokens
+                let signature = confidential_ops::deposit_ct(
+                    rpc_client.clone(),
+                    &token_account,
+                    &owner,
+                    deposit_amount,
+                    decimals,
+                    &elgamal_keypair,
+                ).await?;
+                
+                println!("Tokens deposited to confidential pending balance!");
+                println!("Transaction signature: {}", signature);
+                
+                // Apply pending balance
+                let ae_key = AeKey::new_rand();
+                let apply_signature = confidential_ops::apply_pending(
+                    rpc_client.clone(),
+                    &token_account,
+                    &owner,
+                    &elgamal_keypair,
+                    &ae_key,
+                ).await?;
+                
+                println!("Pending balance applied to available balance!");
+                println!("Transaction signature: {}", apply_signature);
+            },
+            "get-balance" => {
+                // Parse account argument
+                let account = if let Some(arg) = std::env::args().nth(2) {
+                    if arg == "--account" {
+                        std::env::args().nth(3)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                
+                // Parse account address
+                let token_account = if let Some(addr) = account {
+                    addr.parse::<Pubkey>().context("Failed to parse account address")?
+                } else {
+                    return Err(anyhow!("Account address required. Usage: get-balance --account <ADDRESS>"));
+                };
+                
+                // Get public balance
+                let public_balance = confidential_ops::get_public_balance(
+                    rpc_client.clone(),
+                    &token_account,
+                ).await?;
+                
+                println!("Public balance: {}", public_balance);
+                
+                // We can't get confidential balance without ElGamal and AES keys
+                println!("Note: Confidential balance requires encryption keys and is not shown.");
+            },
             _ => {
-                return Err(anyhow!("Unknown command"));
+                // Show available commands
+                println!("Florin Core - Confidential Transfer CLI");
+                println!("\nAvailable commands:");
+                println!("  create-mint --keypair <PATH> --mint-keypair <PATH> --decimals <NUMBER>");
+                println!("  create-account --keypair <PATH> --owner-keypair <PATH> --mint <ADDRESS> [--output-address-only]");
+                println!("  mint --keypair <PATH> --mint <ADDRESS> --destination <ADDRESS> --amount <NUMBER>");
+                println!("  deposit --keypair <PATH> --account <ADDRESS> --amount <NUMBER>");
+                println!("  get-balance --account <ADDRESS>");
+                println!("  confidential-transfer --keypair <PATH> --proof-path <PATH>");
+                println!("  import-transfer-proof <PROOF_PATH> <SOURCE_ACCOUNT> <DESTINATION_ACCOUNT> <AMOUNT>");
+                println!("  import-withdraw-proof <PROOF_PATH> <TOKEN_ACCOUNT> <AMOUNT>");
+                println!("\nFor more detailed help, run with --help");
+                
+                return Err(anyhow!("Unknown command: {}", arg));
             }
         }
         

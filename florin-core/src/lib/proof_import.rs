@@ -1,37 +1,54 @@
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
 use std::path::Path;
+use std::fs;
+use base64::{Engine as _, engine::general_purpose};
 
-/// Represents an importable ZK proof (should match the structure in florin-zk)
-#[derive(Serialize, Deserialize, Clone)]
-pub struct ImportableProof {
-    pub proof_type: ProofType,
-    pub data: Vec<u8>,
-    pub metadata: ProofMetadata,
-}
-
-/// Types of proofs that can be imported
+/// Types of ZK proofs that can be imported (match florin-zk)
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub enum ProofType {
     Transfer,
     Withdraw,
-    CiphertextValidity,
-    Range,
+    PubkeyValidity,
+    // These are the old types, kept for backward compatibility
+    TransferWithProof,
+    WithdrawWithProof,
 }
 
-/// Metadata for the proof
-#[derive(Serialize, Deserialize, Clone)]
+/// Metadata for the proof (match florin-zk)
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProofMetadata {
-    pub source_pubkey: Option<String>,
-    pub destination_pubkey: Option<String>,
+    pub source_address: Option<String>,
+    pub destination_address: Option<String>,
+    pub mint_address: Option<String>,
     pub amount: Option<u64>,
-    pub timestamp: u64,
+    pub timestamp: String,  // ISO8601 format
+}
+
+/// Represents a proof DTO imported from florin-zk
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ImportableProof {
+    pub version: String,
+    pub proof_id: String,   // UUID
+    pub proof_type: ProofType,
+    pub zk_sdk_version: String,
+    pub data: String, // Base64 encoded serialized proof data
+    pub metadata: ProofMetadata,
+}
+
+/// Custom wrapper for proof data types
+/// This must match the format used in florin-zk
+#[derive(Serialize, Deserialize)]
+struct SerializableProofData {
+    pub data_type: String,
+    pub binary_data: Vec<u8>,
 }
 
 /// Import a proof from a file
 pub fn import_proof_from_file(path: &Path) -> Result<ImportableProof> {
-    let file_content = std::fs::read_to_string(path)?;
-    let proof: ImportableProof = serde_json::from_str(&file_content)?;
+    let file_content = fs::read_to_string(path)?;
+    let proof: ImportableProof = serde_json::from_str(&file_content)
+        .map_err(|e| anyhow!("Failed to parse proof JSON: {}", e))?;
     Ok(proof)
 }
 
@@ -40,12 +57,75 @@ pub fn import_proof_from_file(path: &Path) -> Result<ImportableProof> {
 pub fn import_and_verify_proof(path: &Path) -> Result<ImportableProof> {
     let proof = import_proof_from_file(path)?;
     
-    // Use our new verification module to verify the proof
+    // Use our verification module to verify the proof
     if !crate::proof_verification::is_proof_valid(&proof) {
         return Err(anyhow!("Proof verification failed"));
     }
     
     Ok(proof)
+}
+
+/// Extract the binary proof data from the base64 encoded data field
+pub fn extract_proof_binary_data(proof: &ImportableProof) -> Result<Vec<u8>> {
+    // Decode the base64 data
+    let decoded = general_purpose::STANDARD.decode(&proof.data)
+        .map_err(|e| anyhow!("Failed to decode base64 data: {}", e))?;
+    
+    // Parse the inner serialized proof data
+    let serializable_proof: SerializableProofData = serde_json::from_slice(&decoded)
+        .map_err(|e| anyhow!("Failed to parse inner proof data: {}", e))?;
+    
+    Ok(serializable_proof.binary_data)
+}
+
+/// Check if the proof version is compatible with the current implementation
+pub fn is_version_compatible(proof: &ImportableProof) -> bool {
+    // Parse version components
+    let version_parts: Vec<&str> = proof.version.split('.').collect();
+    if version_parts.len() != 3 {
+        return false;
+    }
+    
+    // For now we only care about major version compatibility
+    // In a real implementation, this would be more sophisticated
+    match version_parts[0].parse::<u32>() {
+        Ok(major) => major == 1, // We only support major version 1 for now
+        Err(_) => false,
+    }
+}
+
+/// Validate a proof before using it
+pub fn validate_proof(proof: &ImportableProof) -> Result<()> {
+    // Check version compatibility
+    if !is_version_compatible(proof) {
+        return Err(anyhow!("Incompatible proof version: {}", proof.version));
+    }
+    
+    // Check that we have the required metadata for this proof type
+    match proof.proof_type {
+        ProofType::Transfer | ProofType::TransferWithProof => {
+            if proof.metadata.source_address.is_none() {
+                return Err(anyhow!("Missing source address in transfer proof"));
+            }
+            if proof.metadata.destination_address.is_none() {
+                return Err(anyhow!("Missing destination address in transfer proof"));
+            }
+            if proof.metadata.amount.is_none() {
+                return Err(anyhow!("Missing amount in transfer proof"));
+            }
+        },
+        ProofType::Withdraw | ProofType::WithdrawWithProof => {
+            if proof.metadata.source_address.is_none() {
+                return Err(anyhow!("Missing source address in withdraw proof"));
+            }
+            if proof.metadata.amount.is_none() {
+                return Err(anyhow!("Missing amount in withdraw proof"));
+            }
+        },
+        _ => {}
+    }
+    
+    Ok(())
 }
 
 /// Use the imported proof in a confidential transfer operation
@@ -65,8 +145,8 @@ pub fn use_imported_proof(proof: &ImportableProof) -> Result<()> {
     match proof.proof_type {
         ProofType::Transfer => {
             println!("Using transfer proof from {:?} to {:?} for amount {:?}",
-                proof.metadata.source_pubkey,
-                proof.metadata.destination_pubkey,
+                proof.metadata.source_address,
+                proof.metadata.destination_address,
                 proof.metadata.amount);
             
             // In a real implementation, we would use this proof in a transfer transaction
@@ -74,7 +154,7 @@ pub fn use_imported_proof(proof: &ImportableProof) -> Result<()> {
         },
         ProofType::Withdraw => {
             println!("Using withdraw proof from account {:?} for amount {:?}",
-                proof.metadata.source_pubkey,
+                proof.metadata.source_address,
                 proof.metadata.amount);
             
             // In a real implementation, we would use this proof in a withdraw transaction

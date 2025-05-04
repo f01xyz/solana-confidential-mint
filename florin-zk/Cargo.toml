@@ -25,6 +25,9 @@ clap = { version = "4.4.12", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 dirs = "5.0"
 bytemuck = { version = "1.13", features = ["derive"] }
+uuid = { version = "1.6.1", features = ["v4"] }
+chrono = "0.4.34"
+semver = "1.0.20"
 
 # Instead of using patch, we'll ensure our dependency versions pull in the correct curve25519-dalek version
 # [patch.crates-io]
