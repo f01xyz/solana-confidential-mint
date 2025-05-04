@@ -1,0 +1,10 @@
+{
+  "proof_type": "Withdraw",
+  "data": "eyJkYXRhX3R5cGUiOiJ3aXRoZHJhd19wcm9vZiIsImJpbmFyeV9kYXRhIjpbMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMF19",
+  "metadata": {
+    "source_pubkey": "9NG1Sf7RCp2B1sDWEvrB5zZZX7b3pmqqrr5n9VvLUjzG",
+    "destination_pubkey": null,
+    "amount": 100,
+    "timestamp": 1746379967
+  }
+}

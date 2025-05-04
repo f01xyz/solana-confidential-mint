@@ -1,0 +1,10 @@
+{
+  "proof_type": "Transfer",
+  "data": "eyJkYXRhX3R5cGUiOiJ0cmFuc2Zlcl9wcm9vZiIsImJpbmFyeV9kYXRhIjpbMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMCwwLDAsMF19",
+  "metadata": {
+    "source_pubkey": "9NG1Sf7RCp2B1sDWEvrB5zZZX7b3pmqqrr5n9VvLUjzG",
+    "destination_pubkey": "69RmPxsrzwVbcUtNrWeDKhmv6dUqfL77LVkE4BRsEMVo",
+    "amount": 100,
+    "timestamp": 1746379967
+  }
+}

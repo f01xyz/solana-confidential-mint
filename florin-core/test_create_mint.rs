@@ -7,9 +7,7 @@ use solana_sdk::{
 use std::sync::Arc;
 
 // Import our confidential ops module directly
-mod lib {
-    pub mod confidential_ops;
-}
+use florin_core::confidential_ops;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -36,7 +34,7 @@ async fn main() -> Result<()> {
 
     // TEST: Create a mint with confidential transfer extension
     println!("\n=== TEST: Create confidential mint ===");
-    let (mint_pubkey, mint_sig) = lib::confidential_ops::create_confidential_mint(
+    let (mint_pubkey, mint_sig) = confidential_ops::create_confidential_mint(
         rpc_client.clone(),
         &payer,
         &mint,

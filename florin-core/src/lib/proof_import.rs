@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 use std::path::Path;
 
 /// Represents an importable ZK proof (should match the structure in florin-zk)
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ImportableProof {
     pub proof_type: ProofType,
     pub data: Vec<u8>,
@@ -11,7 +11,7 @@ pub struct ImportableProof {
 }
 
 /// Types of proofs that can be imported
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub enum ProofType {
     Transfer,
     Withdraw,
@@ -20,7 +20,7 @@ pub enum ProofType {
 }
 
 /// Metadata for the proof
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ProofMetadata {
     pub source_pubkey: Option<String>,
     pub destination_pubkey: Option<String>,

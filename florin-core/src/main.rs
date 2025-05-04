@@ -22,8 +22,8 @@ use spl_token_client::{
 };
 
 // Our library with confidential transfer operations
-use lib::confidential_ops;
-use lib::{
+use florin_core::confidential_ops;
+use florin_core::{
     proof_import::{import_and_verify_proof, ProofType},
     proof_verification::{verify_proof, VerificationConfig},
 };
@@ -45,9 +45,8 @@ async fn main() -> Result<()> {
     println!("Connecting to Solana validator at {}", rpc_url);
     println!("Make sure validator is running with: solana-test-validator --clone-upgradeable-program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb --url https://api.mainnet-beta.solana.com -r");
     
-    let rpc_client = Arc::new(RpcClient::new_with_commitment_and_timeout(
+    let rpc_client = Arc::new(RpcClient::new_with_timeout(
         String::from(rpc_url),
-        CommitmentConfig::confirmed(),
         Duration::from_secs(30),
     ));
 
@@ -388,20 +387,33 @@ async fn confidential_transfer_example() -> Result<()> {
         &sender_ae_key,
     ).await?;
 
+    // Create a dummy proof for demonstration purposes
+    let transfer_proof = florin_core::proof_import::ImportableProof {
+        proof_type: florin_core::proof_import::ProofType::Transfer,
+        data: vec![1; 100], // 100 bytes of dummy data
+        metadata: florin_core::proof_import::ProofMetadata {
+            source_pubkey: Some(sender_account.to_string()),
+            destination_pubkey: Some(recipient_account.to_string()),
+            amount: Some(amount),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        },
+    };
+
     // Transfer some tokens confidentially
     let transfer_amount = 50 * 10u64.pow(decimals as u32); // 50 tokens
-    confidential_ops::transfer_ct(
+    confidential_ops::transfer_ct_with_proof(
         rpc_client.clone(),
         &sender_account,
         &recipient_account,
         &payer,
-        &sender_elgamal_keypair,
-        &sender_ae_key,
-        &recipient_elgamal_keypair.pubkey(),
         transfer_amount,
         decimals,
+        &transfer_proof,
     ).await?;
-
+    
     // Apply the pending balance on the recipient account
     confidential_ops::apply_pending(
         rpc_client.clone(),
@@ -411,16 +423,30 @@ async fn confidential_transfer_example() -> Result<()> {
         &recipient_ae_key,
     ).await?;
 
+    // Create a dummy proof for demonstration purposes
+    let withdraw_proof = florin_core::proof_import::ImportableProof {
+        proof_type: florin_core::proof_import::ProofType::Withdraw,
+        data: vec![1; 100], // 100 bytes of dummy data
+        metadata: florin_core::proof_import::ProofMetadata {
+            source_pubkey: Some(recipient_account.to_string()),
+            destination_pubkey: None,
+            amount: Some(transfer_amount),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        },
+    };
+
     // Withdraw half of the tokens from recipient's confidential balance to public
     let withdraw_amount = 25 * 10u64.pow(decimals as u32); // 25 tokens
-    confidential_ops::withdraw_ct(
+    confidential_ops::withdraw_ct_with_proof(
         rpc_client.clone(),
         &recipient_account,
         &recipient_owner,
-        &recipient_elgamal_keypair,
-        &recipient_ae_key,
         withdraw_amount,
         decimals,
+        &withdraw_proof,
     ).await?;
 
     // Get final balances

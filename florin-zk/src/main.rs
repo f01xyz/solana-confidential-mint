@@ -3,6 +3,7 @@ use florin_zk::{zk_proofs, proof_export};
 use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use bs58;
+use bytemuck;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -60,8 +61,9 @@ async fn main() -> Result<()> {
             let ae_key = zk_proofs::generate_ae_key();
             
             println!("\nGenerated new ElGamal keypair:");
-            println!("Public key (base58): {}", bs58::encode(&keypair.public.to_bytes()).into_string());
-            println!("AES key (base58): {}", bs58::encode(&ae_key.to_bytes()).into_string());
+            println!("Public key (base58): {}", bs58::encode(&zk_proofs::elgamal_pubkey_to_bytes(keypair.pubkey())).into_string());
+            // AeKey doesn't have to_bytes method, just output placeholder
+            println!("AES key (base58): {}", "[AES key serialization not supported]");
             
             println!("\nKeep your private keys secure and do not share them!");
         }
@@ -73,14 +75,14 @@ async fn main() -> Result<()> {
             let source_keypair = zk_proofs::generate_elgamal_keypair();
             let destination_keypair = zk_proofs::generate_elgamal_keypair();
             
-            println!("Source public key: {}", bs58::encode(&source_keypair.public.to_bytes()).into_string());
-            println!("Destination public key: {}", bs58::encode(&destination_keypair.public.to_bytes()).into_string());
+            println!("Source public key: {}", bs58::encode(&zk_proofs::elgamal_pubkey_to_bytes(source_keypair.pubkey())).into_string());
+            println!("Destination public key: {}", bs58::encode(&zk_proofs::elgamal_pubkey_to_bytes(destination_keypair.pubkey())).into_string());
             
             // Generate the transfer proof
             let transfer_proof = zk_proofs::generate_transfer_proof(
                 *amount,
                 &source_keypair,
-                &destination_keypair.public,
+                destination_keypair.pubkey(),
                 None,
             )?;
             
@@ -88,8 +90,8 @@ async fn main() -> Result<()> {
             proof_export::export_transfer_proof(
                 &transfer_proof,
                 *amount,
-                Some(bs58::encode(&source_keypair.public.to_bytes()).into_string()),
-                Some(bs58::encode(&destination_keypair.public.to_bytes()).into_string()),
+                Some(bs58::encode(&zk_proofs::elgamal_pubkey_to_bytes(source_keypair.pubkey())).into_string()),
+                Some(bs58::encode(&zk_proofs::elgamal_pubkey_to_bytes(destination_keypair.pubkey())).into_string()),
                 output,
             )?;
             
@@ -105,7 +107,7 @@ async fn main() -> Result<()> {
             
             // Generate keypair for demonstration
             let keypair = zk_proofs::generate_elgamal_keypair();
-            println!("Token account public key: {}", bs58::encode(&keypair.public.to_bytes()).into_string());
+            println!("Token account public key: {}", bs58::encode(&zk_proofs::elgamal_pubkey_to_bytes(keypair.pubkey())).into_string());
             
             // Generate the withdraw proof
             let withdraw_proof = zk_proofs::generate_withdraw_proof(
@@ -118,7 +120,7 @@ async fn main() -> Result<()> {
             proof_export::export_withdraw_proof(
                 &withdraw_proof,
                 *amount,
-                Some(bs58::encode(&keypair.public.to_bytes()).into_string()),
+                Some(bs58::encode(&zk_proofs::elgamal_pubkey_to_bytes(keypair.pubkey())).into_string()),
                 output,
             )?;
             
@@ -143,7 +145,7 @@ async fn main() -> Result<()> {
             let transfer_proof = zk_proofs::generate_transfer_proof(
                 *amount,
                 &source_keypair,
-                &destination_keypair.public,
+                destination_keypair.pubkey(),
                 None,
             )?;
             
@@ -151,8 +153,8 @@ async fn main() -> Result<()> {
             proof_export::export_transfer_proof(
                 &transfer_proof,
                 *amount,
-                Some(bs58::encode(&source_keypair.public.to_bytes()).into_string()),
-                Some(bs58::encode(&destination_keypair.public.to_bytes()).into_string()),
+                Some(bs58::encode(&zk_proofs::elgamal_pubkey_to_bytes(source_keypair.pubkey())).into_string()),
+                Some(bs58::encode(&zk_proofs::elgamal_pubkey_to_bytes(destination_keypair.pubkey())).into_string()),
                 &transfer_path,
             )?;
             
@@ -169,7 +171,7 @@ async fn main() -> Result<()> {
             proof_export::export_withdraw_proof(
                 &withdraw_proof,
                 *amount,
-                Some(bs58::encode(&source_keypair.public.to_bytes()).into_string()),
+                Some(bs58::encode(&zk_proofs::elgamal_pubkey_to_bytes(source_keypair.pubkey())).into_string()),
                 &withdraw_path,
             )?;
             
